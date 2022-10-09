@@ -1,5 +1,15 @@
 # Extend the Kubernetes API with CustomResourceDefinitions
 
+And indeed, in Kubernetes, one can easily register custom resources. The procedure is fully dynamic and doesn't require restarting or updating the API server.
+
+How such a custom resource can be added? Well, again, it's Kubernetes! Of course, by interacting with another, already existing resource! There is a special API resource called CustomResourceDefinition (CRD):
+
+`The CustomResourceDefinition API resource allows you to define custom resources. Defining a CRD object creates a new custom resource with a name and schema that you specify.
+
+Custom Resource Definition is a resource (with it's own endpoint) already added to kubernetes
+You use it to define a new resource which will then also be given an endpoint
+`
+
 This page shows how to install a [custom resource](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/) into the Kubernetes API by creating a [CustomResourceDefinition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#customresourcedefinition-v1-apiextensions-k8s-io).
 
 # TOC
@@ -8,6 +18,9 @@ This page shows how to install a [custom resource](https://kubernetes.io/docs/co
 ---
 
 ## Create a CustomResourceDefinition
+
+Let's try to create a custom resource. Remember, a resource specifies a certain kind of Kubernetes object. Canonically, objects possess some attributes. So, our CustomResourceDefinition should be mostly concerned with describing the attributes of our future resource. Additionally, it's good to know that custom resources can be either namespaced or cluster-scoped. This is specified in the CRD's scope field.
+
 
 `When you create a new CustomResourceDefinition (CRD), the Kubernetes API Server creates a new RESTful resource path for each version you specify.` The custom resource created from a CRD object can be either namespaced or cluster-scoped, as specified in the CRD's spec.scope field. As with existing built-in objects, deleting a namespace deletes all custom objects in that namespace. CustomResourceDefinitions themselves are non-namespaced and are available to all namespaces.
 
@@ -19,13 +32,30 @@ For example, if you have the following CustomResourceDefinition
     kind: CustomResourceDefinition
     # CRD as in Model
     metadata:
-        # name must match the spec fields below, and be in the form: <plural>.<group>
-        # name as in SomethingModel e.g BookCollectionModel
+        # name must match the spec fields below, and be in the form: <plural>.<group> i.e plural-name.group
+        # name as in SomethingModel e.g blogpost, crontab
+        # group is mostly like an organization name/domain e.g fluidcoins/v1/blogpost
+        # name.group togther is expected to be a valid DNS domain
         name: crontabs.stable.example.com
     spec:
         # group name to use for REST API: /apis/<group>/<version>
         group: stable.example.com
         # list of versions supported by this CustomResourceDefinition
+        names:
+            # NAME IS JUST WHAT THE MODEL(RESOURCE) IS CALLED
+            # OBJECTS ARE INSTANCES OF A RESOURCE
+            # plural name to be used in the URL: /apis/<group>/<version>/<plural>
+            plural: crontabs
+            # singular name to be used as an alias on the CLI and for display
+            singular: crontab
+            # kind is normally the CamelCased singular type. Your resource manifests use this.
+            kind: CronTab
+            # shortNames allow shorter string to match your resource on the CLI
+            shortNames:
+            - ct
+            listKind: CronTabList
+        # either Namespaced or Cluster
+        scope: Namespaced
         versions:
             - name: v1
               # Each version can be enabled/disabled by Served flag.
@@ -45,24 +75,72 @@ For example, if you have the following CustomResourceDefinition
                                     type: string
                                 replicas:
                                     type: integer
-        # either Namespaced or Cluster
-        scope: Namespaced
-        names:
-            # NAME IS JUST WHAT THE MODEL(RESOURCE) IS CALLED
-            # OBJECTS ARE INSTANCES OF A RESOURCE
-            # plural name to be used in the URL: /apis/<group>/<version>/<plural>
-            plural: crontabs
-            # singular name to be used as an alias on the CLI and for display
-            singular: crontab
-            # kind is normally the CamelCased singular type. Your resource manifests use this.
-            kind: CronTab
-            # shortNames allow shorter string to match your resource on the CLI
-            shortNames:
-            - ct
 
 ```
 
-And create it:
+Example 2
+
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: blogposts.iximiuz.com
+spec:
+  group: iximiuz.com
+  names:
+    kind: BlogPost
+    listKind: BlogPostList
+    plural: blogposts
+    singular: blogpost
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: BlogPost is a custom resource exemplar
+        type: object
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BlogPostSpec is the spec for a BlogPost resource
+            type: object
+            properties:
+              title:
+                type: string
+              author:
+                type: string
+          status:
+            description: BlogPostStatus is the status for a BlogPost resource
+            type: object
+            properties:
+              publishedAt:
+                type: string
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+EOF
+```
+
+To create a custom resource, feed the YAML definition to `kubectl apply`
 
 ```sh
 kubectl apply -f resourcedefinition.yaml
@@ -72,6 +150,11 @@ Then a new namespaced RESTful API endpoint is created at:
 
 ```
 /apis/stable.example.com/v1/namespaces/*/crontabs/...
+```
+
+For example 2, You can easily validate that the resource has been created:
+```sh
+kubectl api-resources --api-group=iximiuz.com
 ```
 
 ---
@@ -281,3 +364,6 @@ anyOf:
       minimum: 42
   required: ["bar"]
 ```
+
+## Field pruning
+CustomResourceDefinitions store validated resource data in the cluster's persistence store, etcd. As with native Kubernetes resources such as ConfigMap, if you specify a field that the API server does not recognize, the unknown field is pruned (removed) before being persisted.
