@@ -153,8 +153,62 @@ Then a new namespaced RESTful API endpoint is created at:
 ```
 
 For example 2, You can easily validate that the resource has been created:
+
 ```sh
-kubectl api-resources --api-group=iximiuz.com
+$ kubectl api-resources --api-group=iximiuz.com
+NAME        SHORTNAMES   APIVERSION             NAMESPACED   KIND
+blogposts                iximiuz.com/v1alpha1   true         BlogPost
+```
+
+```sh
+$ kubectl explain blogpost
+KIND:     BlogPost
+VERSION:  iximiuz.com/v1alpha1
+```
+
+At this point, we already can create objects of kind BlogPost:
+
+```sh
+$ kubectl apply -f - <<EOF
+apiVersion: iximiuz.com/v1alpha1
+kind: BlogPost
+metadata:
+  name: blog-post-1
+spec:
+  title: Kubernetes makes me scream at night
+  author: Ivan Velichko
+EOF
+
+blogpost.iximiuz.com/blog-post-1 created
+
+```
+
+And manipulate the created objects:
+
+```sh
+$ kubectl get blogposts
+NAME          AGE
+blog-post-1   62s
+
+$ kubectl describe blogposts
+Name:         blog-post-1
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+API Version:  iximiuz.com/v1alpha1
+Kind:         BlogPost
+Metadata:
+  Creation Timestamp:  2021-01-25T21:32:38Z
+...
+  Self Link:         /apis/iximiuz.com/v1alpha1/namespaces/default/blogposts/blog-post-1
+  UID:               3a50dac6-46b6-45e8-ad70-f7663ddf88cb
+Spec:
+  Author:  Ivan Velichko
+  Title:   Kubernetes makes me scream at night
+Events:    <none>
+
+$ kubectl delete blogpost/blog-post-1
+blogpost.iximiuz.com "blog-post-1" deleted
 ```
 
 ---
