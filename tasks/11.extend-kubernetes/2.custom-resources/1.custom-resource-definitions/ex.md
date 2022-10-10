@@ -421,3 +421,5 @@ anyOf:
 
 ## Field pruning
 CustomResourceDefinitions store validated resource data in the cluster's persistence store, etcd. As with native Kubernetes resources such as ConfigMap, if you specify a field that the API server does not recognize, the unknown field is pruned (removed) before being persisted.
+
+
